@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 // Struct definitions
 typedef struct {
@@ -14,14 +15,13 @@ typedef struct TreeNode {
 } TreeNode;
 
 typedef struct {
-    int center_x;
-    int center_y;
-    int radius_squared;
+    long long center_x;
+    long long center_y;
+    long long radius_squared;
 } Circle;
 
 // Global variables
 TreeNode* root = NULL;
-int num_points = 0;
 
 // Function to get max of two integers
 int max(int a, int b) {
@@ -30,19 +30,20 @@ int max(int a, int b) {
 
 // Function to get height of the tree
 int height(TreeNode *N) {
-    if (N == NULL)
-        return 0;
-    return N->height;
+    return N ? N->height : 0;
 }
 
 // Function to create a new node
 TreeNode* newNode(Point point) {
     TreeNode* node = (TreeNode*)malloc(sizeof(TreeNode));
+    if (node == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
+    }
     node->point = point;
-    node->left = NULL;
-    node->right = NULL;
+    node->left = node->right = NULL;
     node->height = 1;
-    return(node);
+    return node;
 }
 
 // Function to right rotate subtree rooted with y
@@ -53,8 +54,8 @@ TreeNode *rightRotate(TreeNode *y) {
     x->right = y;
     y->left = T2;
 
-    y->height = max(height(y->left), height(y->right))+1;
-    x->height = max(height(x->left), height(x->right))+1;
+    y->height = max(height(y->left), height(y->right)) + 1;
+    x->height = max(height(x->left), height(x->right)) + 1;
 
     return x;
 }
@@ -67,23 +68,21 @@ TreeNode *leftRotate(TreeNode *x) {
     y->left = x;
     x->right = T2;
 
-    x->height = max(height(x->left), height(x->right))+1;
-    y->height = max(height(y->left), height(y->right))+1;
+    x->height = max(height(x->left), height(x->right)) + 1;
+    y->height = max(height(y->left), height(y->right)) + 1;
 
     return y;
 }
 
 // Get Balance factor of node N
 int getBalance(TreeNode *N) {
-    if (N == NULL)
-        return 0;
-    return height(N->left) - height(N->right);
+    return N ? height(N->left) - height(N->right) : 0;
 }
 
 // Function to insert a node
 TreeNode* insert(TreeNode* node, Point point) {
     if (node == NULL)
-        return(newNode(point));
+        return newNode(point);
 
     if (point.x < node->point.x)
         node->left = insert(node->left, point);
@@ -92,8 +91,10 @@ TreeNode* insert(TreeNode* node, Point point) {
     else {
         if (point.y < node->point.y)
             node->left = insert(node->left, point);
-        else
+        else if (point.y > node->point.y)
             node->right = insert(node->right, point);
+        else
+            return node;  // Duplicate point, don't insert
     }
 
     node->height = 1 + max(height(node->left), height(node->right));
@@ -127,6 +128,7 @@ TreeNode* insert(TreeNode* node, Point point) {
 void read_points(const char* filename) {
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
+        fprintf(stderr, "Could not open file\n");
         exit(1);
     }
 
@@ -134,7 +136,6 @@ void read_points(const char* filename) {
     while (fscanf(file, "%d %d", &x, &y) == 2) {
         Point point = {x, y};
         root = insert(root, point);
-        num_points++;
     }
 
     fclose(file);
@@ -142,30 +143,32 @@ void read_points(const char* filename) {
 
 // Function to check if a point collides with the circle
 int is_collision(const Circle* circ, const Point* point) {
-    long long dx = (long long)circ->center_x - point->x;
-    long long dy = (long long)circ->center_y - point->y;
-    return dx*dx + dy*dy <= (long long)circ->radius_squared;
+    long long dx = circ->center_x - point->x;
+    long long dy = circ->center_y - point->y;
+    return dx*dx + dy*dy <= circ->radius_squared;
 }
 
 // Function to count collisions
-int count_collisions(TreeNode* node, const Circle* circ) {
+int count_collisions(TreeNode* node, const Circle* circ, int* count) {
     if (node == NULL)
         return 0;
 
-    int count = 0;
     if (is_collision(circ, &node->point))
-        count = 1;
+        (*count)++;
 
-    // If circle is to the right of the node
-    if (circ->center_x - circ->radius_squared > node->point.x)
-        return count + count_collisions(node->right, circ);
+    long long left_bound = circ->center_x - (long long)INT_MAX;
+    long long right_bound = circ->center_x + (long long)INT_MAX;
 
-    // If circle is to the left of the node
-    if (circ->center_x + circ->radius_squared < node->point.x)
-        return count + count_collisions(node->left, circ);
+    if (node->point.x > right_bound)
+        count_collisions(node->left, circ, count);
+    else if (node->point.x < left_bound)
+        count_collisions(node->right, circ, count);
+    else {
+        count_collisions(node->left, circ, count);
+        count_collisions(node->right, circ, count);
+    }
 
-    // Circle overlaps, need to check both subtrees
-    return count + count_collisions(node->left, circ) + count_collisions(node->right, circ);
+    return *count;
 }
 
 // Function to free the AVL tree
@@ -179,7 +182,7 @@ void free_tree(TreeNode* node) {
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
-        printf("Usage: %s <filename>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
         return 1;
     }
 
@@ -187,9 +190,10 @@ int main(int argc, char* argv[]) {
 
     Circle circ;
     int radius;
-    while (scanf("%d %d %d", &circ.center_x, &circ.center_y, &radius) == 3) {
+    while (scanf("%d %d %d", &radius, (int*)&circ.center_x, (int*)&circ.center_y) == 3) {
         circ.radius_squared = (long long)radius * radius;
-        printf("%d\n", count_collisions(root, &circ));
+        int count = 0;
+        printf("%d\n", count_collisions(root, &circ, &count));
     }
 
     free_tree(root);
