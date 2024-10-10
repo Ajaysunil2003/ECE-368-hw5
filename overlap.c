@@ -1,39 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
-//function to take the input file and it will also take the user input (function called inputs)
-    //Take the user inputed point and store it properly (This is the dimensions of the circle)
-        //call it circ_dim (first numner is the x coord of center, second is y coord of center, third number is radius)
-
-    //first take the input ile (points.txt)
-        //store it properly (This points.txt file is a set of points that will be tested with circ_dim)
-
-//function to iterate through the points in points.txt file (iteration)
-    //iterate through each point one by one to be calculated in edistance formula function
-
-//distance formula function (dst_form)
-    //i = 0 //this is a counter for the number of points less than radius
-    //use the distance formula to calculate wheather the distance of the current point in points.txt is less than or greater than the radius
-    //if it is less than the radius than:
-        //i++
-    //if it isnt less than the radius than iterate to the next point in points.txt and do the same thing
-
-    //print i
-
-
-//main:
-    //call inputs function
-    //call iteration function
-    //call dst_form function
-    //return 0
-
-typedef struct {
+//struct definitions
+typedef struct { //struct for the points in points.txt
     int x;
     int y;
 } Point;
 
-typedef struct {
+typedef struct { //struct for user inputed points
     int center_x;
     int center_y;
     int radius;
@@ -42,6 +16,7 @@ typedef struct {
 Point* points = NULL;
 int num_points = 0;
 
+//function to take the input file and it will also take the user input
 void read_points(const char* filename) {
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
@@ -59,11 +34,11 @@ void read_points(const char* filename) {
 
     fclose(file);
 }
-
+//distance formula function
 double calculate_distance(int x1, int y1, int x2, int y2) {
     return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
 }
-
+//function to count the number of collisions
 int count_collisions(Circle circ) {
     int collisions = 0;
     for (int i = 0; i < num_points; i++) {
