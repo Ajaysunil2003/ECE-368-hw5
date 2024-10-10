@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
+
 //struct definitions
 typedef struct { //struct for the points in points.txt
     int x;
@@ -10,7 +10,7 @@ typedef struct { //struct for the points in points.txt
 typedef struct { //struct for user inputed points
     int center_x;
     int center_y;
-    int radius;
+    int radius_squared;  // Store radius squared to avoid sqrt in distance calculation (first version timed out)
 } Circle;
 
 Point* points = NULL;
@@ -20,7 +20,6 @@ int num_points = 0;
 void read_points(const char* filename) {
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
-        printf("Error opening file\n");
         exit(1);
     }
 
@@ -34,16 +33,19 @@ void read_points(const char* filename) {
 
     fclose(file);
 }
-//distance formula function
-double calculate_distance(int x1, int y1, int x2, int y2) {
-    return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
+
+//function to check if a point collides with the circle
+int is_collision(Circle* circ, Point* point) {
+    int dx = circ->center_x - point->x;
+    int dy = circ->center_y - point->y;
+    return dx*dx + dy*dy <= circ->radius_squared;
 }
+
 //function to count the number of collisions
-int count_collisions(Circle circ) {
+int count_collisions(Circle* circ) {
     int collisions = 0;
     for (int i = 0; i < num_points; i++) {
-        double distance = calculate_distance(circ.center_x, circ.center_y, points[i].x, points[i].y);
-        if (distance <= circ.radius) {
+        if (is_collision(circ, &points[i])) {
             collisions++;
         }
     }
@@ -59,9 +61,10 @@ int main(int argc, char* argv[]) {
     read_points(argv[1]);
 
     Circle circ;
-    while (scanf("%d %d %d", &circ.center_x, &circ.center_y, &circ.radius) == 3) {
-        int collisions = count_collisions(circ);
-        printf("%d\n", collisions);
+    int radius;
+    while (scanf("%d %d %d", &circ.center_x, &circ.center_y, &radius) == 3) {
+        circ.radius_squared = radius * radius;
+        printf("%d\n", count_collisions(&circ));
     }
 
     free(points);
