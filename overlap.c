@@ -7,11 +7,6 @@ typedef struct { //struct for the points in points.txt
     int y;
 } Point;
 
-typedef struct TreeNode {
-    Point point;
-    struct TreeNode *left, *right;
-} TreeNode;
-
 typedef struct { //struct for user inputed points
     int center_x;
     int center_y;
@@ -20,7 +15,6 @@ typedef struct { //struct for user inputed points
 
 Point* points = NULL;
 int num_points = 0;
-TreeNode* root = NULL;
 
 //function to take the input file and it will also take the user input
 void read_points(const char* filename) {
@@ -48,64 +42,49 @@ int compare_points(const void* a, const void* b) {
     return p1->y - p2->y;
 }
 
-// Function to create a new node
-TreeNode* new_node(Point point) {
-    TreeNode* node = (TreeNode*)malloc(sizeof(TreeNode));
-    node->point = point;
-    node->left = node->right = NULL;
-    return node;
-}
-
-// Function to create balanced BST from sorted array
-TreeNode* sorted_array_to_bst(Point* points, int start, int end) {
-    if (start > end) return NULL;
-    
-    int mid = (start + end) / 2;
-    TreeNode* node = new_node(points[mid]);
-    
-    node->left = sorted_array_to_bst(points, start, mid - 1);
-    node->right = sorted_array_to_bst(points, mid + 1, end);
-    
-    return node;
-}
-
 //function to check if a point collides with the circle
-int is_collision(Circle* circ, Point* point) {
+int is_collision(const Circle* circ, const Point* point) {
     int dx = circ->center_x - point->x;
     int dy = circ->center_y - point->y;
     return dx*dx + dy*dy <= circ->radius_squared;
 }
 
-//function to count the number of collisions using BST
-int count_collisions_bst(TreeNode* node, Circle* circ) {
-    if (node == NULL) return 0;
-    
-    int count = 0;
-    if (is_collision(circ, &node->point)) {
-        count = 1;
+// Binary search to find the leftmost point that might collide
+int binary_search_left(const Circle* circ, int low, int high) {
+    while (low < high) {
+        int mid = low + (high - low) / 2;
+        if (points[mid].x >= circ->center_x - circ->radius_squared)
+            high = mid;
+        else
+            low = mid + 1;
     }
-    
-    // If the circle's leftmost x-coordinate is to the right of the node's x-coordinate,
-    //don't need to check the left subtree
-    if (circ->center_x - circ->radius_squared <= node->point.x) {
-        count += count_collisions_bst(node->left, circ);
-    }
-    
-    // If the circle's rightmost x-coordinate is to the left of the node's x-coordinate,
-    //don't need to check the right subtree
-    if (circ->center_x + circ->radius_squared >= node->point.x) {
-        count += count_collisions_bst(node->right, circ);
-    }
-    
-    return count;
+    return low;
 }
 
-// Function to free the BST
-void free_bst(TreeNode* node) {
-    if (node == NULL) return;
-    free_bst(node->left);
-    free_bst(node->right);
-    free(node);
+// Binary search to find the rightmost point that might collide
+int binary_search_right(const Circle* circ, int low, int high) {
+    while (low < high) {
+        int mid = low + (high - low + 1) / 2;
+        if (points[mid].x <= circ->center_x + circ->radius_squared)
+            low = mid;
+        else
+            high = mid - 1;
+    }
+    return high;
+}
+
+//function to count the number of collisions
+int count_collisions(const Circle* circ) {
+    int left = binary_search_left(circ, 0, num_points - 1);
+    int right = binary_search_right(circ, left, num_points - 1);
+    
+    int collisions = 0;
+    for (int i = left; i <= right; i++) {
+        if (is_collision(circ, &points[i])) {
+            collisions++;
+        }
+    }
+    return collisions;
 }
 
 int main(int argc, char* argv[]) {
@@ -116,21 +95,16 @@ int main(int argc, char* argv[]) {
 
     read_points(argv[1]);
 
-    // Sort the points
+    // Sorting points
     qsort(points, num_points, sizeof(Point), compare_points);
-
-    // Create balanced BST
-    root = sorted_array_to_bst(points, 0, num_points - 1);
 
     Circle circ;
     int radius;
     while (scanf("%d %d %d", &circ.center_x, &circ.center_y, &radius) == 3) {
         circ.radius_squared = radius * radius;
-        printf("%d\n", count_collisions_bst(root, &circ));
+        printf("%d\n", count_collisions(&circ));
     }
 
-    
-    free_bst(root);
     free(points);
     return 0;
 }
